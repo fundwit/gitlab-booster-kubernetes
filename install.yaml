@@ -1,0 +1,148 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: gitlab-booster
+  namespace: default
+spec:
+  ports:
+    - name: web
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+  selector:
+    app: gitlab-booster
+  type: ClusterIP
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: gitlab-booster
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gitlab-booster
+  template:
+    metadata:
+      labels:
+        app: gitlab-booster
+    spec:
+      containers:
+      - env:
+        - name: MYSQL_USER
+          value: xxx
+        - name: MYSQL_PWD
+          value: xxx
+        - name: DATABASE_URL
+          value: mysql://${MYSQL_USER}:${MYSQL_PWD}@tcp(os-mysql-svc.default:3306)/gitlab-booster?charset=utf8mb4&parseTime=true&loc=Local
+        - name: GITLAB_ENDPOINT
+          value: http://git.xxxx.com
+        # 在 gitlab 全局或某个分组中创建 Application 时获得，（创建Application时，回调地址应填写 gitlab-booster-ui服务的外部访问地址）
+        - name: GITLAB_OAUTH_CLIENT_ID
+          value: "somevalue"
+        # 在 gitlab 全局或某个分组中创建 Application 时获得
+        - name: GITLAB_OAUTH_CLIENT_SECRET
+          value: "somevalue"
+        - name: TZ
+          value: ":Asia/Shanghai"
+        image: registry.cn-beijing.aliyuncs.com/fundwit/gitlab-booster:v0.1.0.da8c263349
+        livenessProbe:
+            failureThreshold: 10
+            httpGet:
+              path: /
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            successThreshold: 1
+            timeoutSeconds: 1
+        name: gitlab-booster
+        readinessProbe:
+            failureThreshold: 10
+            httpGet:
+              path: /
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 1
+        resources:
+            limits:
+              cpu: 500m
+              memory: 400Mi
+            requests:
+              cpu: 100m
+              memory: 100Mi
+      nodeSelector:
+        nodeType: controller
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gitlab-booster-ui
+  namespace: default
+spec:
+  ports:
+    - name: web
+      port: 80
+      protocol: TCP
+      targetPort: 80
+  selector:
+    app: gitlab-booster-ui
+  type: ClusterIP
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: gitlab-booster-ui
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gitlab-booster-ui
+  template:
+    metadata:
+      labels:
+        app: gitlab-booster-ui
+    spec:
+      containers:
+      - env:
+        # gitlab-booster 后端服务的访问信息
+        - name: API_ENDPOINT
+          value: gitlab-booster:8080
+        - name: TZ
+          value: ":Asia/Shanghai"
+        image: registry.cn-beijing.aliyuncs.com/fundwit/gitlab-booster-ui:v0.1.0.1e94f6e633
+        livenessProbe:
+            failureThreshold: 10
+            httpGet:
+              path: /
+              port: 80
+              scheme: HTTP
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            successThreshold: 1
+            timeoutSeconds: 1
+        name: gitlab-booster-ui
+        readinessProbe:
+            failureThreshold: 10
+            httpGet:
+              path: /
+              port: 80
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 1
+        resources:
+            limits:
+              cpu: 500m
+              memory: 400Mi
+            requests:
+              cpu: 100m
+              memory: 100Mi
+      nodeSelector:
+        nodeType: controller
